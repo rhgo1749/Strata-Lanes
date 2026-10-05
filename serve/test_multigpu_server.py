@@ -132,6 +132,27 @@ class MultiGpuPlanningTests(unittest.TestCase):
         self.assertNotIn("layer_split", got)
         self.assertNotIn("--layer-split", got["args"])
 
+    def test_lane_config_strips_upstream_internal_parallelism(self):
+        cfg = {
+            "parallel": 4,
+            "args": [
+                "--pack", "/m",
+                "--batch", "4",
+                "--slots", "3",
+                "--batch-groups", "2",
+                "--trim-stage-weights",
+            ],
+        }
+        got = M.sanitize_lane_config(cfg)
+        self.assertNotIn("parallel", got)
+        self.assertNotIn("--batch", got["args"])
+        self.assertNotIn("--slots", got["args"])
+        self.assertNotIn("--batch-groups", got["args"])
+        self.assertNotIn("--trim-stage-weights", got["args"])
+
+    def test_responses_api_is_generation_work(self):
+        self.assertIn("/v1/responses", M.GENERATE_PATHS)
+
     def test_lane_config_disables_upstream_conversation_parking(self):
         cfg = {"args": ["--pack", "/m", "--conversation-cache-mib", "8192",
                          "--conversation-cache-slots", "4"]}

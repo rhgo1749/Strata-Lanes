@@ -6,7 +6,7 @@ Roadmap authority is GitHub Issue #1 and its child Issues. This document summari
 
 ## Current production baseline
 
-The current promoted engine generation is **Strata 0.1.38** in this fork, integrated from upstream `99f3dbd0b21d1401b3769e0c0d963913607f380b`. The 0.1.38 compatibility gate preserves the independent-lane architecture while consuming upstream prompt/decode, reliability, security/status, profile-persistence, unbuffered-load, and optional peer-tier primitives. Upstream layer-split/peer execution remains a challenger/backend primitive rather than a replacement for request-level lanes.
+The current promoted engine generation is **Strata 0.1.38** in this fork, integrated from upstream `99f3dbd0b21d1401b3769e0c0d963913607f380b`. A **validated 0.1.39 sync candidate** exists on `sync/upstream-0.1.39` at `3727c6bdfb12ba2ffc07402b68ae86c0ed2ac27f`, merging upstream `6f32ec070f23ced9f50e704d854d775da52591ab`; it is not promoted until main moves. The candidate preserves the independent-lane architecture while consuming upstream batching, Responses API, conversation-cache telemetry, decode/kernel, CPU-pool, expert-cache, low-RAM/file-tier, and layer-split improvements. Ordinary lanes strip inherited upstream internal batching just as they already strip inherited layer-split/peer execution, so those mechanisms remain explicit challenger/backend primitives rather than accidental replacements for request-level lanes.
 
 The architectural baseline is:
 
@@ -156,7 +156,7 @@ Measure the crossover rather than assuming aggregation wins: single-request TTFT
 
 Do **not** begin with dynamic GPU bonding. Reopen bond/unbond policy only if the static `1+1+1` versus `2+1` experiment demonstrates a repeatable workload-dependent crossover large enough to justify topology changes. Any dynamic version must retain a clean independent-lane fallback and must not migrate an active session merely to rebalance GPUs.
 
-**Current status on Strata 0.1.38 / the reference host: deferred, evidence-negative as an always-on topology, but intentionally left open.** The matched static probe preserved the known single-request benefit (~99 tok/s for the two-GPU Super-Lane versus ~68 tok/s for an ordinary lane), but `2+1` did not establish a useful M=2 aggregate advantage and regressed M=3 aggregate goodput by about 15% versus `1+1+1`. This does not reject upstream layer split as a primitive. Reopen with a short single-request smoke, then M=2, then M=3 only if upstream materially improves layer-split decode/prefill, handoff/staging, split-auto placement, queueing/FIFO behavior, or another relevant execution path enough to move the crossover.
+**Current status on the Strata 0.1.39 sync candidate / reference host: reopened as a serious default-topology challenger; not yet promoted.** Upstream 0.1.39 materially changed the layer-split server through batch slots, pipeline groups and stage-weight trimming. The fixed three-GPU `18,34` pipeline with `--batch 3 --batch-groups 3 --trim-stage-weights` and the shared expert arena now beats independent lanes in the measured fixed decode region at both M=2 (**147.84 ± 2.26 vs 143.19 ± 3.06 tok/s, +3.25%**) and M=3 (**209.66 ± 4.02 vs 192.16 ± 4.11, +9.11%**). The retained M=1 layer-split control is also much faster than one lane, although that point was not rerun with the exact pipeline config. Cold-prefill is the important counterexample: ~15K x3 strongly favors lanes (**5901.34 vs 3289.19 tok/s**), while ~110K x3 narrowly favors the pipelined split (**6028.09 vs 5822.71 tok/s**). The next gate is therefore no longer more fixed microbenchmarks; it is mixed prompt/output lengths, session behavior, queue/tail latency, power, failure isolation and operational flexibility under the always-on three-GPU layer-split topology. Full evidence: [`strata-0.1.39-performance-crossover-20261005.md`](strata-0.1.39-performance-crossover-20261005.md).
 
 ### Elastic Super-Lane lifecycle
 
@@ -247,10 +247,10 @@ Until measurements justify them, this roadmap does **not** assume that Strata sh
 
 ## Near-term order
 
-1. Keep the completed Phase 1/2 serving-control and Phase 3 lifecycle gates as regression controls on the promoted 0.1.38 software baseline; retain the measured 0.1.30/0.1.31 evidence under its original engine generation.
+1. Keep the completed Phase 1/2 serving-control and Phase 3 lifecycle gates as regression controls on the promoted 0.1.38 software baseline. The validated 0.1.39 sync candidate has passed the bounded compatibility gate and should remain a candidate until explicitly promoted; retain measured 0.1.30/0.1.31/0.1.38 evidence under its original engine generation.
 2. Do not add another mandatory serving phase without a measured residual.
-3. Keep the completed decode-assist and static `2+1` measurements as **0.1.38 evidence-negative / deferred challengers**, not permanent rejections. Do not repeat the same reference-host sweeps without a material upstream, hardware, or workload change.
-4. Reopen decode assist or static Super-Lane with the smallest staged smoke that can show the crossover moved; only then repeat broader concurrency or lifecycle campaigns. Elastic Super-Lane remains gated on a successful future static crossover; cross-lane migration stays later.
+3. Keep decode assist as **0.1.38 evidence-negative / deferred**, but treat static layer split / Super-Lane as **reopened on 0.1.39** because the measured batch-group pipeline now crosses independent lanes in some decode and very-long-prefill regions. Do not collapse the result into a universal winner claim.
+4. Before any topology promotion, test mixed prompt/output lengths, queue/tail behavior, power, failure-domain cost and the drain/reconfigure/restore lifecycle against the independent-lane fallback. Elastic Super-Lane remains gated on this broader static crossover holding after reconfiguration cost; cross-lane migration stays later.
 5. Treat upstream helper, peer, layer-split and load/unload controls as distinct execution/lifecycle primitives: helper offload is valid without P2P, peer execution is deferred on hardware without a validated P2P path, and neither automatically replaces independent lanes.
 
 The default bias remains deliberate simplicity: add coupling only when measurements show it buys something.

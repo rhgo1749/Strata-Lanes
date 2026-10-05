@@ -42,7 +42,7 @@ HOP_BY_HOP = {
     "connection", "keep-alive", "proxy-authenticate", "proxy-authorization",
     "te", "trailer", "transfer-encoding", "upgrade",
 }
-GENERATE_PATHS = {"/v1/chat/completions", "/v1/messages"}
+GENERATE_PATHS = {"/v1/chat/completions", "/v1/messages", "/v1/responses"}
 VISION_METADATA_PATHS = {"/health", "/props", "/models", "/v1/models"}
 AFFINITY_HEADERS = ("x-strata-session-id", "x-conversation-id", "x-session-id", "x-thread-id")
 AFFINITY_FIELDS = ("conversation_id", "session_id", "thread_id")
@@ -94,6 +94,7 @@ def sanitize_lane_config(cfg: dict, *, allow_profile_persistence: bool = False,
     lane_cfg = copy.deepcopy(cfg)
     lane_cfg.pop("gpu", None)
     lane_cfg.pop("layer_split", None)
+    lane_cfg.pop("parallel", None)
     if not allow_profile_persistence:
         # server.py can synthesize the CLI writer flags from these top-level
         # keys, so stripping only cfg["args"] would still leave several lanes
@@ -118,9 +119,13 @@ def sanitize_lane_config(cfg: dict, *, allow_profile_persistence: bool = False,
             "--expert-cache-device2",
             "--expert-cache-device3",
             "--expert-cache-remote-placement",
+            "--batch",
+            "--slots",
+            "--batch-groups",
         ):
             args = remove_option(args, name)
         args = remove_flag(args, "--split-skip-if-fits")
+        args = remove_flag(args, "--trim-stage-weights")
 
         # Upstream 0.1.36 can persist an adaptive expert profile.  A copied
         # parent path would give several lane processes the same writer, so
