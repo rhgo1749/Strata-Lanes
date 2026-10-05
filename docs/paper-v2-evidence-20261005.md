@@ -20,6 +20,7 @@
 - Upstream Strata: `6f32ec070f23ced9f50e704d854d775da52591ab`
 - PR #24 software merge to main: `9ae0839b9f376dca9742804924db05902f872ad8`
 - Promotion-documentation commit: `aaf843090d9a8239ca91fb9a40adfa337a80ddea`
+- Research-mode repository-positioning commit: `b5e419262bb840ba08950cfe632d665b79be22f2`
 - Final validated sync head before merge: `1a454ca80d698af863693c1b2d3fafac0b3b1ceb`
 - Performance binary source generation: `d51d7e9cbc327f90c2fd59b1e20a949033f594e2`
 - Measured binary SHA-256: `9aa71607ca3c322c61e75e2fbbb0cbd8f1816f663c9c856b6df342ecd9e18c05`
@@ -29,7 +30,7 @@ The later commits after the measured binary are documentation/promotion-state ch
 ### Reproducibility recipe / retained evidence
 
 - Repository: `rhgo1749/qwen3.8-flash-next-strata-gpu-per-lane-recipe`
-- Current evidence/promotion main: `3fb35129345615790495b13d1a573a9f8e27ecf2`
+- Current experimental-record main: `607cb0347882298e379501ab81d7298162c30d9c`
 - Raw retained evidence: `bench/raw/0.1.39-20261005/`
 - Compact topology table: `bench/layer-split-ab-0.1.39-20261005.csv`
 - Human-readable topology record: `docs/strata-0.1.39-performance-crossover-20261005.md`
@@ -70,6 +71,12 @@ Every retained PP request used a unique nonce and reported `cache_n=0`.
 | ~110K ×3 | 5822.71 ± 4.49 | **6028.09 ± 14.50** | layer split +3.5% |
 
 The 15K/110K arms are workload/length matched but not byte-identical because the nonce text encodes the topology arm.
+
+## Repository role after the 0.1.39 crossover
+
+The implementation fork and companion recipe are now explicitly maintained as **research / reproducibility records**, not as a general deployment recommendation. Normal Strata users are directed to upstream `Niko1221/Strata`. Historical Lanes code, launch instructions, raw benchmarks, and serving-control experiments remain available for reproduction and future comparison.
+
+This positioning change does not alter the retained measurements; it changes how the repositories present their current role.
 
 ## What changed from the 2026-10-01 evidence snapshot
 
