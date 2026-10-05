@@ -1,4 +1,6 @@
-# Strata-Lanes multi-lane usage
+# Strata-Lanes experimental / reproduction usage
+
+> **Research-mode notice:** this document explains how to reproduce the historical Strata-Lanes runtime. It is not a recommendation to use this fork instead of upstream Strata for normal serving. For ordinary use, prefer https://github.com/Niko1221/Strata.
 
 This document covers the **Strata-Lanes multi-lane serving layer**. The serving entry point is `serve/multigpu_server.py`.
 

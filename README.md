@@ -1,232 +1,111 @@
-<h1 align="center">Strata-Lanes</h1>
+# Strata-Lanes
 
-<p align="center"><b>Downstream multi-lane fork of <a href="https://github.com/Niko1221/Strata">Niko1221/Strata</a>.</b><br>
-Upstream Strata is created and maintained by Niko1221; this fork carries the GPU-per-lane / shared-arena extensions.</p>
+> **Research fork / experimental evidence archive.**
+>
+> This repository is **not recommended as the general-purpose way to run Strata**.
+> For normal installation and day-to-day Strata use, use the upstream project:
+> **[Niko1221/Strata](https://github.com/Niko1221/Strata)**.
 
-**English** · [简体中文](README.zh-CN.md) · [日本語](README.ja.md) · [Deutsch](README.de.md) · [Français](README.fr.md) · [Español](README.es.md) · [Português](README.pt-BR.md)
+Strata-Lanes started as an experiment in **request-level GPU parallelism**: run one independent whole-model Strata engine per GPU, keep session/KV state lane-local, and physically share the large host-RAM expert arena across the processes.
 
-<p align="center"><b>Run a 125-billion-parameter AI model on your own gaming PC</b><br>
-NVIDIA or AMD graphics card (12 GB or more) · Windows or Linux · free and open source</p>
+The implementation is kept here because the experiment produced useful systems evidence: shared-memory accounting, independent-lane scaling, session-affinity scheduling, queue behavior, conversation parking, heterogeneous-GPU isolation, and a sequence of matched comparisons against upstream multi-GPU execution.
 
-<p align="center"><a href="https://github.com/Niko1221/Strata/releases/download/v0.1.10/Pagoda.mp4"><img src="docs/media/pagoda-preview.webp" width="720" alt="A voxel pagoda garden that Strata's model wrote, running in the browser"></a><br>
-<sub>A voxel pagoda garden, 1 shot prompt running on an RTX 5070 with Strata (IQ3_S, 128K context) ·
-<a href="https://github.com/Niko1221/Strata/releases/download/v0.1.10/Pagoda.mp4">full video (49 s)</a></sub></p>
+## Why this is now a research record
 
-Strata runs **[Qwen3.8-Flash-Next](https://huggingface.co/Qwen/Qwen3.8-Flash-Next)** on a normal PC. This is a
-large, smart AI model that usually needs a server. It chats, writes code, reads pictures and works with your apps
-and coding agents. Nothing leaves your PC.
+The original motivation was that independent GPU lanes could preserve single-GPU execution while scaling aggregate serving throughput without NVLink or token-by-token cross-GPU synchronization.
 
-## How fast is it?
+That was true in important workload regions, but upstream Strata changed materially.
 
-We measured it on two ordinary gaming PCs. A token is about ¾ of a word.
+With Strata 0.1.39, upstream added batch slots, layer-split pipeline groups, and stage-weight trimming. On the reference 3×RTX 5070 Ti host, the strongest upstream-native three-GPU layer-split configuration now matches or exceeds independent lanes in several regions.
 
-- **Writes answers:** how fast the reply appears in a short chat. 60 tokens per second is faster than you can read.
-- **Reads your prompt:** how fast it takes in what you send (here a 32K-token document, code or chat history).
-
-<table>
-<tr><th>NVIDIA: RTX 5070 (12 GB), Ryzen 5 7600, 64 GB RAM</th><th>AMD: RX 9070 XT (16 GB), Ryzen 9 3900X, 47 GB RAM</th></tr>
-<tr><td>
-
-| Size | Writes answers | Reads your prompt |
+| Region | Independent lanes | Pipelined layer split |
 | --- | ---: | ---: |
-| **Q2_0** | 94 tokens/s | 2,650 tokens/s |
-| **IQ2_XS** | 79 tokens/s | 2,090 tokens/s |
-| **IQ3_XXS** | 62 tokens/s | 1,750 tokens/s |
-| **IQ3_S** | 53 tokens/s | 1,620 tokens/s |
-| **Coder** | 55 tokens/s | 2,180 tokens/s |
+| M=1 fixed decode | 73.63 ± 1.67 tok/s | **120.62 ± 1.24 tok/s**¹ |
+| M=2 fixed decode | 143.19 ± 3.06 tok/s | **147.84 ± 2.26 tok/s** |
+| M=3 fixed decode | 192.16 ± 4.11 tok/s | **209.66 ± 4.02 tok/s** |
+| three ~15K cold prompts | **5901.34 ± 55.16 tok/s** | 3289.19 ± 18.83 tok/s |
+| three ~110K cold prompts | 5822.71 ± 4.49 tok/s | **6028.09 ± 14.50 tok/s** |
 
-</td><td>
+¹ M=1 is the retained same-binary three-GPU layer-split single-request control; the exact batch3/groups3/trim configuration was not rerun at M=1.
 
-| Size | Writes answers | Reads your prompt |
-| --- | ---: | ---: |
-| **Q2_0** | 60 tokens/s | 1,160 tokens/s |
-| **IQ2_XS** | 52 tokens/s | 1,110 tokens/s |
-| **Coder** | 44 tokens/s | 1,420 tokens/s |
+So the current evidence is a **workload-dependent topology crossover**, not “lanes always win concurrency” and not “layer split always wins.”
 
-</td></tr>
-</table>
+Because upstream is now the better default place for normal users, this fork no longer presents independent lanes as a generally recommended deployment architecture.
 
-NVIDIA: Q2_0 with engine 0.1.36, the other rows with 0.1.26 (4K answers, 32K prompts). The full tables are in
-[DETAILS.md](docs/DETAILS.md#speed-measured). A card with more VRAM is faster: an RTX 3090 (24 GB) should write
-about 100-140 tokens per second. Long chats and other cards: [speed of each model](docs/MODELS.md#how-fast-is-each-size),
-[community results](docs/COMMUNITY_BENCHMARKS.md).
+## What is preserved here
 
-<p align="center"><a href="https://buymeacoffee.com/strataengine"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50"></a><br>
-<sub>Strata is free. If it runs well on your PC, a coffee keeps the work on it going.</sub></p>
+This repository remains useful as an active research/evidence archive for:
 
-## What you need
+- independent whole-model GPU lanes;
+- a shared file-backed host expert arena across lane processes;
+- leader/follower arena population and lifecycle;
+- session affinity and lane-local state ownership;
+- queue/admission instrumentation;
+- conversation parking experiments;
+- heterogeneous-GPU serving and interference studies;
+- historical decode-assist / Super-Lane experiments;
+- matched independent-lane ↔ upstream layer-split comparisons;
+- paper/revision evidence and source provenance.
 
-| | |
-| --- | --- |
-| **Graphics card** | **NVIDIA** GeForce RTX 20, 30, 40 or 50 series, or **AMD** Radeon RX 7900 XT / XTX, RX 7800 XT / 7700 XT, RX 9060 XT, RX 9070 / 9070 XT, Radeon AI PRO R9700 or RX 6800 / 6900 series. It needs **12 GB of VRAM or more**. |
-| **RAM** | 32 GB or more. Your RAM decides [which model](#which-model-should-i-pick) fits. 64 GB runs every size. |
-| **Disk** | About 80 GB free. Use an SSD if you can: the first start is much faster. |
-| **System** | Windows 10 / 11 or Linux, and a current graphics driver from NVIDIA or AMD. |
+The code is intentionally preserved so old measurements can be reproduced and future upstream changes can be compared against the same experimental architecture.
 
-The installer sets up everything else. Two or three cards can share the model ([multi-GPU](docs/MULTI_GPU.md)).
+## Current evidence
 
-Experimental, written and tested by community members on their own machines:
+The compact 0.1.39 topology record is:
 
-- **Older graphics cards** (Tesla P40 / V100, GTX 10, Radeon VII / MI50, RX 6700 XT, RX 5500 XT): [Older GPUs](docs/OLDER_GPUS.md).
-- **Intel Arc**, built from source on Linux: [Intel Arc](docs/INTEL_ARC.md).
-- **Older processors without AVX2**: they work, but slowly. [Older CPUs](docs/INSTALL.md#older-cpus-experimental).
+- [0.1.39 topology crossover](docs/strata-0.1.39-performance-crossover-20261005.md)
+- [Paper v2 evidence snapshot](docs/paper-v2-evidence-20261005.md)
+- public retained raw data and harnesses in the companion evidence repository:
+  [rhgo1749/qwen3.8-flash-next-strata-gpu-per-lane-recipe](https://github.com/rhgo1749/qwen3.8-flash-next-strata-gpu-per-lane-recipe)
 
-The full list: [docs/INSTALL.md](docs/INSTALL.md#what-you-need).
+Canonical implementation history and decisions:
 
-## Install
+- [Architecture decisions](docs/DECISIONS.md)
+- [Shared runtime contract](docs/multigpu-shared-runtime.md)
+- [Multi-GPU roadmap](docs/multigpu-roadmap.md)
+- [Fork / implementation boundary](docs/fork-and-implementation.md)
 
-### Let your AI set it up
+## Reproducing the historical Lanes runtime
 
-Do you use an AI coding assistant (Claude Code, Cursor, Codex, GitHub Copilot, ...)? Paste this into it:
+The multi-lane implementation still exists in this fork and can be used for controlled reproduction.
 
-```text
-Set up Strata on this PC for me: https://github.com/Niko1221/Strata - follow docs/AI_SETUP.md in that repository.
-```
+See [Strata-Lanes multi-lane usage](docs/LANES_USAGE.md).
 
-It checks your graphics card, RAM and disk and picks the model that fits. Then it installs and starts it and tells
-you how to connect your apps. AI tools can also install, start and stop Strata through its
-[MCP server](docs/MCP_SERVER.md).
+That document is now **reproduction/experimental documentation**, not a recommendation to replace upstream Strata for normal serving.
 
-### Or do it yourself
+The central runtime shape is still:
 
-[Download Strata](https://github.com/Niko1221/Strata/archive/refs/heads/main.zip) and unzip it (or `git clone` it).
-**Windows:** double-click **`START-HERE.bat`**. **Linux:** run **`./setup.sh`** in the Strata folder.
+    client requests
+          |
+    session-aware supervisor
+       /    |    \
+    lane0  lane1  lane2       <- independent Strata engines
+       \     |     /
+     shared host expert arena
 
-The steps are the same for NVIDIA and AMD. The installer finds your card and sets up the right engine for it. It
-asks you a few questions:
+Each lane owns its own CUDA state, expert cache, KV/session state, speculative state, and generation loop. The host expert mapping can be physically shared.
 
-- which model and which size,
-- how much context (how much text the model keeps in mind),
-- whether it should read pictures.
+## Repository status
 
-Press Enter each time for the recommended answer. Then it downloads the model (about 70 GB) and starts it. If the
-download stops, run it again: it continues where it left off. Your browser opens the Strata app at
-`http://127.0.0.1:8080`.
+- **Mode:** active research / evidence archive
+- **Upstream for normal use:** [Niko1221/Strata](https://github.com/Niko1221/Strata)
+- **Current imported engine generation:** Strata 0.1.39
+- **General deployment recommendation:** none
+- **Historical Lanes implementation:** preserved and reproducible
+- **Future changes:** evidence-driven experiments, provenance fixes, or upstream-comparison work
 
-> **While the model starts, your PC can be slow or stop responding for 1-3 minutes** (longest the first time).
-> Strata loads 35-55 GB into your RAM and locks part of it for the graphics card. This is normal. Wait, and don't
-> close the window. The window shows what Strata is doing.
+This is intentionally **not** GitHub-archived: the evidence may still be extended if upstream behavior changes or a paper revision needs additional validation.
 
-**Next time**, run `START-HERE.bat` (or `./setup.sh`) again. It starts right away and downloads nothing twice. Close
-its window to stop the model. `UPDATE.bat` (`./update.sh`) updates Strata without starting it. Updating, Docker,
-several cards, where the files go and every option: [docs/INSTALL.md](docs/INSTALL.md).
+## Paper evidence
 
-## Which model should I pick?
+- paper-v1 identifies the submitted v1 state.
+- paper-v2-evidence identifies the current post-v1 experimental evidence snapshot.
+- paper-v2 remains reserved for an actual revised manuscript/submission state.
 
-The installer recommends one for your RAM. The same model comes in several sizes, compressed more or less. Smaller
-sizes are faster. Larger sizes are a bit smarter.
-
-| Your RAM | Take | Why |
-| --- | --- | --- |
-| **32 GB** | **Coder** | it fits 32 GB, and it is made for code (with a 24 GB card, Q2_0 and IQ2_XS run too) |
-| **48 GB** | **IQ2_XS** (or Q2_0, the fastest) | the larger sizes do not fit |
-| **64 GB** | **IQ2_XS** (recommended), or IQ3_XXS / IQ3_S | every size fits; IQ3_S is the best and the slowest |
-| **96 GB or more** | **IQ3_S**, or Unsloth's UD-IQ4_XS (~4-bit) | room for the largest sizes with everything else open |
-
-- **[Coder](docs/MODELS.md#coder):** a coding version with half of the experts removed. It reaches 91% of the full
-  model's SWE-bench Verified score (measured by its authors) and fits 32 GB of RAM. It is weaker outside code,
-  including Chinese and other CJK text (#438). For those, take Q2_0, IQ2_XS or IQ3_S, which keep every expert.
-- **[Swift 1.5](docs/MODELS.md#swift-15):** a fine-tune that thinks for a much shorter time before it answers. You
-  get the answer sooner, at about the same quality.
-- **[Unsloth UD-IQ4_XS](docs/MODELS.md#unsloth-ud-iq4_xs):** Unsloth's ~4-bit version, between IQ3_S and
-  UD-Q4_K_XL in quality. A 94 GB download. With less than ~80 GB of RAM, Strata reads part of it from the SSD
-  while it answers, so it is slower there (an NVMe SSD helps).
-- **[Unsloth UD-Q4_K_XL](docs/MODELS.md#unsloth-ud-q4_k_xl-experimental)** (experimental): the closest to the full
-  model. But Strata reads most of it from the SSD while it answers, so it writes only 7-8.5 tokens/s on a 64 GB PC.
-- **[OrcaRouter's Uncensored IQ3_XXS](docs/MODELS.md#orcarouter-uncensored-iq3_xxs):** you set it up by hand. It is
-  not in the installer's menu.
-
-Sizes, downloads and what fits where: [docs/MODELS.md](docs/MODELS.md). To add another model later, run
-`SETUP.bat` (Linux: `./setup.sh --setup`).
-
-## Using it
-
-### Multi-lane mode in this fork
-
-The upstream-style single-engine server remains available, while **Strata-Lanes multi-lane serving is started directly with `serve/multigpu_server.py`**.
-
-A minimal shape is:
-
-```bash
-python3 serve/multigpu_server.py \
-  --config /path/to/strata.json \
-  --gpus 0,1,2 \
-  --port 18086 \
-  --base-port 19086 \
-  --arena-file /dev/shm/strata-lanes.shared
-```
-
-For long-lived chats/agents, send a stable `X-Strata-Session-Id` on every turn so the conversation stays on its remembered lane. Conversation parking, vision-lane selection, CPU/PCIe/KV partitioning, status/trace endpoints, recovery semantics and a complete launch example are documented in **[Strata-Lanes multi-lane usage](docs/LANES_USAGE.md)**.
-
-<p align="center"><img src="docs/media/runpagoda.png" width="900" alt="The Strata app's Monitor tab next to a coding agent"><br>
-<sub>The Strata app's <b>Monitor</b> (left) while a coding agent writes the pagoda garden from the video (right)</sub></p>
-
-- **In the browser:** open `http://127.0.0.1:8080`. It has **Chat**, a live **Monitor** of the model and your
-  GPU/CPU/RAM, and **About** with the settings and addresses.
-- **Your apps and coding agents:** add an "OpenAI-compatible" provider with the base URL
-  **`http://127.0.0.1:8080/v1`**. Any API key and any model name work.
-  - Apps that use Anthropic's API: `http://127.0.0.1:8080/v1/messages` (Claude Code:
-    `ANTHROPIC_BASE_URL=http://127.0.0.1:8080`).
-  - Codex CLI and other apps that use the OpenAI Responses API: `/v1/responses`
-    ([setup](docs/DETAILS.md#the-responses-api-and-codex-cli)).
-- **Thinking:** choose **off, low, medium or high** in the chat menu or in your app's "reasoning effort". Off is the
-  fastest. High is best for hard questions.
-- **Pictures:** say yes to "Images?" in setup. Then click **Picture** in the chat, or attach pictures in your app.
-  AMD cards read pictures on Linux through the processor; on Windows they can't yet.
-- **From your phone or another PC:** `START-HERE.bat --setup --host 0.0.0.0 --api-key <secret>`. Always set a key.
-- **Concurrency:** the ordinary upstream-style single-engine server answers one request at a time by default; it can
-  opt into `"parallel": 2` ([BATCHING.md](docs/BATCHING.md)). In **Strata-Lanes multi-lane mode**, each ordinary
-  lane remains an independent whole-GPU engine by default, while separate lanes serve separate requests concurrently.
-- **Long prompts:** Strata reads the first message of a chat in full, about 1 minute per 30,000 tokens. Follow-up
-  messages start in seconds when their lane-local state can be reused.
-
-More: [where your chats are stored](docs/INSTALL.md#where-things-are-stored), [the API](docs/DETAILS.md#using-it).
-
-## Something went wrong?
-
-- **My PC froze the first time Strata started.** This is normal while it loads the model. Wait, and don't close the
-  window. Still frozen after 10 minutes? Restart the PC, close other programs and try again, or pick a smaller size.
-- **It stopped while downloading or installing.** Run `START-HERE.bat` (or `./setup.sh`) again. It continues where
-  it stopped.
-- **It's very slow and the disk light keeps blinking, or it says "the engine stopped unexpectedly".** Your PC does
-  not have enough free RAM. Close other programs (browsers use a lot), or pick a smaller size (Q2_0 or IQ2_XS).
-- **It says port 8080 is already in use.** Strata is already running. Look for its window.
-
-More problems and their fixes: [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md). Still stuck? Open an
-[issue](https://github.com/Niko1221/Strata/issues) and attach `strata-<model>.log` from the Strata folder. Found a
-security problem? Report it privately: [SECURITY.md](SECURITY.md).
-
-## How does it work?
-
-Models like this one usually run on servers with hundreds of gigabytes of graphics memory. Your graphics card has
-12-24 GB. Strata makes the model fit by **sharing the work across your whole PC**. Think of a kitchen: the things
-you use all the time stay on the counter, and the rest waits in the pantry.
-
-<p align="center"><img src="docs/media/how-it-works.svg" width="860" alt="The model's 24,576 experts: the busiest on the graphics card, all of them in RAM, a lookup table on the SSD"></p>
-
-- **The model is a team of 24,576 small specialists ("experts").** Each word needs only 10 of them.
-- **Your graphics card** keeps the few thousand experts that are used most often. **Your RAM** holds all of them,
-  and **your processor** works on the rest at the same time. **Your SSD** holds a big lookup table.
-
-<p align="center"><img src="docs/media/guess-and-check.svg" width="860" alt="A small helper guesses the next words; the big model checks them all at once and keeps the right ones"></p>
-
-- **Guess, then check:** a small helper guesses the next few words. The big model checks them all at once. You get
-  the same answer, 1.6-1.8x sooner.
-- **Long texts are read in big pieces** (up to 8,192 tokens at a time), at over 1,000 tokens per second.
-
-The longer explanation: [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md). Every part and its numbers:
-[the details](docs/DETAILS.md#how-it-works) and the [paper](docs/paper/Strata-Paper.pdf).
+The latest evidence manifest is [docs/paper-v2-evidence-20261005.md](docs/paper-v2-evidence-20261005.md).
 
 ## Credits and license
 
-The model is [Qwen3.8-Flash-Next](https://huggingface.co/Qwen/Qwen3.8-Flash-Next) by the Qwen team. It was
-compressed by [ISTA-DASLab](https://huggingface.co/ISTA-DASLab/Qwen3.8-Flash-Next-GSQ-RCO-GGUF), UkisAI (Swift 1.5)
-and Unsloth. Strata uses parts of [llama.cpp / ggml](https://github.com/ggml-org/llama.cpp). All credits:
-[docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md#credits). Strata is open source under the [MIT License](LICENSE). A few
-parts and every model have their own licenses ([which ones](docs/HOW_IT_WORKS.md#license)).
+Upstream Strata is created and maintained by **Niko1221**. This fork inherits Strata's codebase and carries the experimental Lanes extensions and evidence history described above.
 
-## Support Strata
-
-Strata is free and open source. If it is useful to you, you can support its development:
-
-<p align="center"><a href="https://buymeacoffee.com/strataengine"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50"></a></p>
+Strata and this fork are distributed under the licenses present in the repository. Model files and third-party components retain their own licenses.

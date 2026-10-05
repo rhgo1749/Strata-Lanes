@@ -1,12 +1,12 @@
 # Multi-GPU runtime roadmap
 
-This roadmap covers the experimental multi-GPU serving runtime in this fork. It is deliberately conservative: the independent-lane design remains the production baseline until a more complex mechanism demonstrates a repeatable end-to-end advantage on real serving workloads.
+This roadmap covers the experimental multi-GPU serving runtime preserved in this research fork. The repository no longer presents independent lanes as the recommended general-purpose deployment; upstream Strata is the default user-facing path. The independent-lane design remains a reference experimental baseline for controlled comparisons.
 
 Roadmap authority is GitHub Issue #1 and its child Issues. This document summarizes the durable direction. Concrete reference-host hardware, tuning values, benchmark tables, and production validation records live in the separate public recipe repository: [`rhgo1749/qwen3.8-flash-next-strata-gpu-per-lane-recipe`](https://github.com/rhgo1749/qwen3.8-flash-next-strata-gpu-per-lane-recipe).
 
-## Current production baseline
+## Current reference experimental baseline
 
-The current promoted engine generation is **Strata 0.1.39**, integrated from upstream `6f32ec070f23ced9f50e704d854d775da52591ab` through PR #24 and promoted on main at `9ae0839b9f376dca9742804924db05902f872ad8`. The production topology remains the independent-lane architecture while consuming upstream batching, Responses API, conversation-cache telemetry, decode/kernel, CPU-pool, expert-cache, low-RAM/file-tier, and layer-split improvements. Ordinary lanes strip inherited upstream internal batching just as they already strip inherited layer-split/peer execution, so those mechanisms remain explicit challenger/backend primitives rather than accidental replacements for request-level lanes.
+The current promoted engine generation is **Strata 0.1.39**, integrated from upstream `6f32ec070f23ced9f50e704d854d775da52591ab` through PR #24 and promoted on main at `9ae0839b9f376dca9742804924db05902f872ad8`. The retained reference topology remains the independent-lane architecture while consuming upstream batching, Responses API, conversation-cache telemetry, decode/kernel, CPU-pool, expert-cache, low-RAM/file-tier, and layer-split improvements. Ordinary lanes strip inherited upstream internal batching just as they already strip inherited layer-split/peer execution, so those mechanisms remain explicit challenger/backend primitives rather than accidental replacements for request-level lanes.
 
 The architectural baseline is:
 
@@ -18,7 +18,7 @@ The architectural baseline is:
 - session affinity plus hardware-agnostic live-state-aware placement;
 - routing above the engines rather than token-, layer-, or expert-level GPU synchronization.
 
-Matched validation keeps the intended workload split: upstream layer-split remains a useful single-request challenger, while independent lanes remain the production baseline for concurrent serving. Hardware-specific measurements and caveats belong in the recipe repository.
+Matched validation keeps the intended workload split: upstream layer-split remains a useful single-request challenger, while independent lanes remain a reference baseline for concurrent-serving experiments. Hardware-specific measurements and caveats belong in the recipe repository.
 
 ## Design rule
 
