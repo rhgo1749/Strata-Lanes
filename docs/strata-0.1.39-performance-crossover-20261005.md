@@ -2,7 +2,7 @@
 
 ## Status
 
-This record belongs to the validated but not-yet-promoted Strata 0.1.39 sync candidate. It records only the measurements needed for the current topology decision; concrete raw evidence and supporting controls live in the public recipe repository.
+This record is part of the **promoted Strata 0.1.39 software baseline**. The measurements were collected on the validated pre-promotion source generation and remain the evidence for the current topology decision; concrete raw evidence and supporting controls live in the public recipe repository.
 
 Measured source: `d51d7e9cbc327f90c2fd59b1e20a949033f594e2` on `sync/upstream-0.1.39`, upstream Strata `6f32ec070f23ced9f50e704d854d775da52591ab` (v0.1.39).
 
