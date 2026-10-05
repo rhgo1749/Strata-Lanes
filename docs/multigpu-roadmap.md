@@ -6,7 +6,7 @@ Roadmap authority is GitHub Issue #1 and its child Issues. This document summari
 
 ## Current production baseline
 
-The current promoted engine generation is **Strata 0.1.38** in this fork, integrated from upstream `99f3dbd0b21d1401b3769e0c0d963913607f380b`. The 0.1.38 compatibility gate preserves the independent-lane architecture while consuming upstream prompt/decode, reliability, security/status, profile-persistence, unbuffered-load, and optional peer-tier primitives. Upstream layer-split/peer execution remains a challenger/backend primitive rather than a replacement for request-level lanes.
+The current promoted engine generation is **Strata 0.1.38** in this fork, integrated from upstream `99f3dbd0b21d1401b3769e0c0d963913607f380b`. A **validated 0.1.39 sync candidate** exists on `sync/upstream-0.1.39` at `3727c6bdfb12ba2ffc07402b68ae86c0ed2ac27f`, merging upstream `6f32ec070f23ced9f50e704d854d775da52591ab`; it is not promoted until main moves. The candidate preserves the independent-lane architecture while consuming upstream batching, Responses API, conversation-cache telemetry, decode/kernel, CPU-pool, expert-cache, low-RAM/file-tier, and layer-split improvements. Ordinary lanes strip inherited upstream internal batching just as they already strip inherited layer-split/peer execution, so those mechanisms remain explicit challenger/backend primitives rather than accidental replacements for request-level lanes.
 
 The architectural baseline is:
 
@@ -247,7 +247,7 @@ Until measurements justify them, this roadmap does **not** assume that Strata sh
 
 ## Near-term order
 
-1. Keep the completed Phase 1/2 serving-control and Phase 3 lifecycle gates as regression controls on the promoted 0.1.38 software baseline; retain the measured 0.1.30/0.1.31 evidence under its original engine generation.
+1. Keep the completed Phase 1/2 serving-control and Phase 3 lifecycle gates as regression controls on the promoted 0.1.38 software baseline. The validated 0.1.39 sync candidate has passed the bounded compatibility gate and should remain a candidate until explicitly promoted; retain measured 0.1.30/0.1.31/0.1.38 evidence under its original engine generation.
 2. Do not add another mandatory serving phase without a measured residual.
 3. Keep the completed decode-assist and static `2+1` measurements as **0.1.38 evidence-negative / deferred challengers**, not permanent rejections. Do not repeat the same reference-host sweeps without a material upstream, hardware, or workload change.
 4. Reopen decode assist or static Super-Lane with the smallest staged smoke that can show the crossover moved; only then repeat broader concurrency or lifecycle campaigns. Elastic Super-Lane remains gated on a successful future static crossover; cross-lane migration stays later.
